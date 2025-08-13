@@ -1,0 +1,61 @@
+// #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
+use crate::gtk::settings_win::AppSettings;
+mod gtk;
+mod logic;
+
+const APPNAME: &str = "ShinCrypt";
+
+#[derive(Clone, Default)]
+pub struct AppState {
+  pub settings: AppSettings,
+  pub consts: AppConsts,
+}
+
+#[derive(Clone)]
+pub struct AppConsts {
+  pub app_name: String,
+  pub file_name: String,
+  pub version: String,
+  pub author: String,
+  pub repo_owner: String,
+  pub repository: String,
+  pub download_url: String,
+  pub patreon_url: String,
+
+  pub upad: u32,
+  pub margin: i32,
+}
+
+impl Default for AppConsts {
+  fn default() -> Self {
+    let app_name = String::from(APPNAME);
+    let file_name = if cfg!(target_os = "windows") { format!("{}.exe", app_name) } else { app_name.clone() };
+    let version = String::from(env!("CARGO_PKG_VERSION"));
+    let author = String::from("Game Hacking Dojo");
+    let repo_owner = String::from("GameHackingDojo");
+    let repository = app_name.clone();
+    let download_url = format!("https://api.github.com/repos/{}/{}/releases/latest", repo_owner, repository);
+    let patreon_url = format!("https://www.patreon.com/c/{}", repo_owner);
+
+    return Self {
+      app_name: String::from(APPNAME),
+      upad: 10,
+      margin: 20,
+      file_name,
+      version,
+      author,
+      repo_owner,
+      repository,
+      download_url,
+      patreon_url,
+    };
+  }
+}
+
+// const ICON_BYTES: &[u8] = if cfg!(target_os = "windows") { include_bytes!("../resources/icon.ico") } else { include_bytes!("../resources/icon.png") };
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+  gtk::gtk_ui::gtk_ui();
+  Ok(())
+}

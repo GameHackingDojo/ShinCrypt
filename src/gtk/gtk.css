@@ -1,0 +1,38 @@
+* {
+  /*border-color: red; */ /* Changes border color globally */
+  outline-color: #8c182c; /* Changes focus/outline color globally */
+}
+
+.app_toast_box {
+  background: #8c182caa;
+  /* margin-left: auto; */
+  margin-bottom: 20px;
+  /* color: white; */
+  border-radius: 8px;
+  padding: 20px 20px; /* Combine padding-left/right */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+
+  margin-top: 40px;
+}
+
+text selection {
+  background-color: #8c182caa; /* Highlight */
+}
+
+progressbar progress {
+  background-color: #8c182c; /* Filled color */
+  min-width: 0px;
+  border: none; /* Remove border */
+  outline: none; /* Remove focus outline */
+}
+
+/*progressbar.progress_bar trough progress {
+  background-color: #aa3a45cc;
+}*/
+
+/* The tick mark itself */
+checkbutton check:checked {
+  background-image: none;
+  background-color: #aa3a45cc;
+  /*color: black; /* tick mark color */
+}
