@@ -11,7 +11,8 @@ pub enum FileDir {
 }
 
 impl FileDir {
-  pub fn what(path: std::path::PathBuf) -> Result<FileDir, Box<dyn std::error::Error>> {
+  pub fn what(path: impl AsRef<std::path::Path>) -> Result<FileDir, Box<dyn std::error::Error>> {
+    let path = path.as_ref();
     if !path.exists() {
       return Err("Invalid path".into());
     }

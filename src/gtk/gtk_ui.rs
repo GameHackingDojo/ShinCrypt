@@ -146,8 +146,8 @@ pub fn gtk_ui() -> gtk::glib::ExitCode {
       settings_ui(&window_c, aps_c.clone());
     });
 
-    let encrypt_btn = gtk::Button::with_label("Encrypt");
-    let decrypt_btn = gtk::Button::with_label("Decrypt");
+    let encrypt_btn = gtk::Button::with_label("Encrypt 🔒");
+    let decrypt_btn = gtk::Button::with_label("Decrypt 🔓");
 
     grid.attach(&encrypt_btn, 0, 4, 1, 1);
     grid.attach(&decrypt_btn, 1, 4, 1, 1);

@@ -44,7 +44,7 @@ pub fn about_win(window: &gtk::ApplicationWindow, aps: Arc<RwLock<AppState>>) {
         if v {
           match Global::download_latest_version(aps_c.clone()) {
             Ok(_) => (),
-            Err(e) => println!("{}{}", ("Error = "), e),
+            Err(e) => GTKhelper::message_box(&window_c, "Error", format!("{}", e), None),
           }
         } else {
           GTKhelper::message_box(&window_c, "No updates", "No updates are currently available\nThis is the latest version\n\n", None);

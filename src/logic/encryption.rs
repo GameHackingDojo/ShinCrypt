@@ -1,7 +1,10 @@
-use crate::APPNAME;
+use crate::{APPNAME, logic::global::FileDir};
 use argon2::password_hash::PasswordHasher;
 use chacha20::cipher::{KeyIvInit, StreamCipher};
+
 use std::io::{BufRead, Read, Write};
+
+static FILE_HEADER_SIZE: usize = 1024 * 4; // 4 KB
 
 static FILE_1GB: usize = 1024 * 1024 * 1024; // 1 GB
 static CHUNK_1MB: usize = 1024 * 1024; // 1 MB
@@ -10,8 +13,25 @@ static CHUNK_1MB: usize = 1024 * 1024; // 1 MB
 static CHUNK: usize = CHUNK_1MB;
 
 static NONCE_SIZE: usize = 24;
-static ENCRYPTION_EXT: &str = APPNAME;
+static ENCRYPTION_EXT: &str = "snc";
 static BENCHMARK_EXT: &str = "benchmark";
+static ENCRYPTION_VERSION: u16 = 1;
+
+#[repr(u16)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum EncMethod {
+  #[default]
+  XChaCha20 = 1,
+}
+
+impl EncMethod {
+  pub fn from_u16(num: u16) -> Option<Self> {
+    match num {
+      1 => Some(EncMethod::XChaCha20),
+      _ => None,
+    }
+  }
+}
 
 struct EncryptingWriter<W: Write> {
   inner: W,
@@ -164,42 +184,130 @@ impl<R: Read> Read for DecryptingReader<R> {
 
 #[repr(C)]
 #[derive(Clone, Debug, Default)]
-pub struct FileInfo {
-  pub is_file: bool,
-  pub name_len: u8,
+pub struct FileHeader {
+  pub packed: bool,
+  pub file: bool,
+  pub version: u16,
+  pub encryption: EncMethod,
+  pub name_len: u16,
   pub name: String,
+  pub path_len: u16,
   pub path: std::path::PathBuf,
 }
 
-impl FileInfo {
-  pub fn new(is_file: bool, name: impl AsRef<str>, path: std::path::PathBuf) -> Self {
+impl FileHeader {
+  pub fn new(packed: bool, file: bool, version: u16, encryption: EncMethod, name: impl AsRef<str>, path: impl AsRef<std::path::Path>) -> Self {
     let name = name.as_ref().to_string();
-    Self { is_file, name_len: name.len() as u8, name, path }
+    let path = path.as_ref().to_path_buf();
+    Self {
+      packed,
+      file,
+      version,
+      encryption,
+      name_len: name.len() as u16,
+      name,
+      path_len: path.to_str().unwrap().len() as u16,
+      path,
+    }
   }
 
   pub fn to_vec(&self) -> Vec<u8> {
-    let is_file = [self.is_file as u8];
-    let name_len = [self.name.len() as u8];
-    let name_vec = self.name.as_bytes().to_vec();
+    let packed = self.packed as u16;
+    let file = self.file as u16;
+    let version = self.version;
+    let encryption = self.encryption as u16;
+    let name_len = self.name.len() as u16;
+    let name_bytes = self.name.as_bytes();
+    let path_len = self.path_len;
+    let path = self.path.to_str().unwrap().as_bytes();
 
-    let mut file_info = Vec::with_capacity(2 + std::u8::MAX as usize);
-    file_info.extend_from_slice(&is_file);
-    file_info.extend_from_slice(&name_len);
-    file_info.extend_from_slice(&name_vec);
+    let mut file_header = vec![0u8; FILE_HEADER_SIZE];
+    let mut pos = 0; // Track current write position
 
-    file_info
+    let var_size = size_of::<u16>();
+
+    // Write packed (2 bytes)
+    file_header[pos..pos + var_size].copy_from_slice(&packed.to_le_bytes());
+    pos += var_size;
+
+    // Write file (2 bytes)
+    file_header[pos..pos + var_size].copy_from_slice(&file.to_le_bytes());
+    pos += var_size;
+
+    // Write version (2 bytes)
+    file_header[pos..pos + var_size].copy_from_slice(&version.to_le_bytes());
+    pos += var_size;
+
+    // Write encryption (2 bytes)
+    file_header[pos..pos + var_size].copy_from_slice(&encryption.to_le_bytes());
+    pos += var_size;
+
+    // Write name_len (2 bytes)
+    file_header[pos..pos + var_size].copy_from_slice(&name_len.to_le_bytes());
+    pos += var_size;
+
+    // Write name_bytes (variable length)
+    let name_end = pos + name_bytes.len();
+    file_header[pos..name_end].copy_from_slice(name_bytes);
+    pos += name_bytes.len();
+
+    // Write path_len (2 bytes)
+    file_header[pos..pos + var_size].copy_from_slice(&path_len.to_le_bytes());
+    pos += var_size;
+
+    // Write path (2 bytes)
+    let path_end = pos + path.len();
+    file_header[pos..path_end].copy_from_slice(path);
+    pos += path.len();
+
+    file_header
   }
 
   pub fn from_vec(vec: &[u8]) -> Result<Self, Box<dyn std::error::Error>> {
-    let is_file = vec[0] != 0;
-    let name_len = vec[1];
-    let struct_len = 2 + name_len as usize;
-    let name = String::from_utf8(vec[2..struct_len].to_vec()).unwrap();
+    if vec.len() != FILE_HEADER_SIZE {
+      return Err("Incorrect header".into());
+    }
 
-    Ok(Self { is_file, name_len, name, path: std::path::PathBuf::default() })
+    let mut pos = 0; // Track current write position
+    let var_size = size_of::<u16>();
+
+    let packed = u16::from_le_bytes(vec[pos..pos + var_size].try_into()?) != 0;
+    pos += var_size;
+
+    let file = u16::from_le_bytes(vec[pos..pos + var_size].try_into()?) != 0;
+    pos += var_size;
+
+    let version = u16::from_le_bytes(vec[pos..pos + var_size].try_into()?);
+    pos += var_size;
+
+    let encryption_num = u16::from_le_bytes(vec[pos..pos + var_size].try_into()?);
+    pos += var_size;
+
+    let name_len = u16::from_le_bytes(vec[pos..pos + var_size].try_into()?) as usize;
+    pos += var_size;
+
+    let name = String::from_utf8(vec[pos..pos + name_len].to_vec()).map_err(|_| "Invalid UTF-8 in name")?;
+    pos += name_len;
+
+    let path_len = u16::from_le_bytes(vec[pos..pos + var_size].try_into()?) as usize;
+    pos += var_size;
+
+    let path = std::path::PathBuf::from(String::from_utf8(vec[pos..pos + path_len].to_vec()).map_err(|_| "Invalid UTF-8 in name")?);
+    pos += path_len;
+
+    let encryption = EncMethod::from_u16(encryption_num).ok_or("Invalid encryption method")?;
+
+    Ok(Self {
+      packed,
+      file,
+      version,
+      encryption,
+      name_len: name_len as u16,
+      name,
+      path_len: path_len as u16,
+      path,
+    })
   }
-
-  // pub fn len(&self) -> usize { self.name.len() + 2 }
 }
 
 pub struct ShinCrypt {
@@ -240,12 +348,23 @@ impl ShinCrypt {
   // pub fn encrypt_chunk(cipher: &mut chacha20::cipher::StreamCipherCoreWrapper<chacha20::XChaChaCore<chacha20::cipher::typenum::UInt<chacha20::cipher::typenum::UInt<chacha20::cipher::typenum::UInt<chacha20::cipher::typenum::UInt<chacha20::cipher::typenum::UTerm, chacha20::cipher::consts::B1>, chacha20::cipher::consts::B0>, chacha20::cipher::consts::B1>, chacha20::cipher::consts::B0>>>, chunk: &mut [u8]) { cipher.apply_keystream(chunk); }
 
   pub fn encrypt_file(&self) -> Result<(), String> {
-    // let time = std::time::Instant::now();
+    // Validate input path exists
+    if !self.input_path.exists() {
+      return Err(format!("Input path does not exist: {:?}", self.input_path));
+    }
 
-    let file_info = FileInfo::new(self.input_path.is_file(), self.input_path.file_name().unwrap().to_str().unwrap(), self.input_path.clone());
-    let mut file_info_vec = file_info.to_vec();
+    let file = FileDir::what(&self.input_path).map(|v| if v == FileDir::Directory { true } else { false }).unwrap();
+    let packed = file;
 
-    let file_size = fs_extra::dir::get_size(self.input_path.clone()).unwrap() as usize;
+    // Get file name with better error handling
+    let file_name = self.input_path.file_name().ok_or_else(|| "Input path has no file name".to_string())?.to_str().ok_or_else(|| "File name is not valid UTF-8".to_string())?;
+
+    // Create file header
+    let file_h = FileHeader::new(packed, file, ENCRYPTION_VERSION, EncMethod::XChaCha20, file_name, &self.input_path);
+    let mut file_h_vec = file_h.to_vec();
+
+    // Get file size with error handling
+    let file_size = fs_extra::dir::get_size(self.input_path.clone()).map_err(|e| format!("Failed to get input size: {}", e))? as usize;
 
     // Prepare encryption
     let salt = Self::get_salt(None);
@@ -253,18 +372,29 @@ impl ShinCrypt {
     let nonce = Self::gen_nonce();
     let mut cipher = chacha20::XChaCha20::new(key.as_bytes().into(), &nonce.into());
 
-    // Create output file
-    let file_name = self.input_path.file_name().unwrap();
-    let file_path = self.output_dir.join(file_name).with_extension(ENCRYPTION_EXT);
-    let mut out_file = std::fs::File::create(file_path).map_err(|e| format!("Invalid path\n{}", e))?;
+    let def_output = self.output_dir.join(file_name).with_extension(ENCRYPTION_EXT);
 
-    // Write salt + nonce
-    writeln!(out_file, "{}", salt.as_str()).unwrap();
-    out_file.write_all(&nonce).unwrap();
+    // Create output file with better error handling
+    let mut file_path = if self.input_path == def_output {
+      let mut v = def_output;
+      v.set_file_name(format!("{} - new", self.input_path.file_stem().unwrap().to_str().unwrap()));
+      v.set_extension(ENCRYPTION_EXT);
+      v
+    } else {
+      def_output
+    };
+
+    // file_path.set_extension(ENCRYPTION_EXT);
+
+    let mut out_file = std::fs::File::create(&file_path).map_err(|e| format!("Failed to create output file at {:?}: {}", file_path, e))?;
+
+    // Write salt + nonce with error handling
+    writeln!(out_file, "{}", salt.as_str()).map_err(|e| format!("Failed to write salt: {}", e))?;
+    out_file.write_all(&nonce).map_err(|e| format!("Failed to write nonce: {}", e))?;
 
     // Write encrypted file info
-    cipher.apply_keystream(&mut file_info_vec);
-    out_file.write_all(&file_info_vec).unwrap();
+    cipher.apply_keystream(&mut file_h_vec);
+    out_file.write_all(&file_h_vec).map_err(|e| format!("Failed to write file header: {}", e))?;
 
     // Create an encrypting writer that wraps the output file
     let mut encrypting_writer = EncryptingWriter::new(out_file, cipher);
@@ -276,93 +406,77 @@ impl ShinCrypt {
 
     encrypting_writer.set_total_input_size(file_size);
 
-    // // Optionally, set total input size (if you can compute it)
-    // if let Ok(metadata) = std::fs::metadata(&self.input_path) {
-    //   encrypting_writer.set_total_input_size(metadata.len() as usize);
-    // }
-
-    // Stream the tar directly to the encrypting writer
-    {
+    if packed {
+      // Stream the tar with better error handling
       let mut tar_builder = tar::Builder::new(&mut encrypting_writer);
-      if self.input_path.is_dir() {
-        tar_builder.append_dir_all(self.input_path.file_name().unwrap(), &self.input_path).unwrap();
-      } else {
-        tar_builder.append_path_with_name(&self.input_path, self.input_path.file_name().unwrap()).unwrap();
-      }
-      tar_builder.finish().unwrap();
+
+      let result = if self.input_path.is_dir() { tar_builder.append_dir_all(file_name, &self.input_path) } else { tar_builder.append_path_with_name(&self.input_path, file_name) };
+
+      result.map_err(|e| format!("Failed to add files to archive: {}", e))?;
+
+      tar_builder.finish().map_err(|e| format!("Failed to finalize archive: {}", e))?;
+    } else {
+      // Open input file for reading
+      let mut in_file = std::fs::File::open(&self.input_path).map_err(|e| format!("Failed to open input file: {}", e))?;
+
+      // Stream the input file through the encrypting writer
+      std::io::copy(&mut in_file, &mut encrypting_writer).map_err(|e| format!("Failed to write encrypted file: {}", e))?;
     }
 
-    encrypting_writer.flush().unwrap();
-
-    // dbg!(time.elapsed());
+    encrypting_writer.flush().map_err(|e| format!("Failed to flush writer: {}", e))?;
 
     Ok(())
   }
 
-  pub fn decrypt_file(&self) -> Result<FileInfo, String> {
-    // let time = std::time::Instant::now();
-
-    let mut in_file = match std::fs::File::open(&self.input_path).map_err(|e| e.to_string()) {
-      Ok(v) => v,
-      Err(_) => return Err(format!("Failed to decrypt file")),
-    };
+  pub fn decrypt_file(&self) -> Result<(), String> {
+    // Open input file
+    let mut in_file = std::fs::File::open(&self.input_path).map_err(|e| format!("Failed to open input file: {}", e))?;
     let mut buf_reader = std::io::BufReader::new(&mut in_file);
 
-    let file_size = fs_extra::dir::get_size(self.input_path.clone()).unwrap() as usize;
+    // File size for progress
+    let file_size = std::fs::metadata(&self.input_path).map_err(|e| format!("Failed to get file size: {}", e))?.len() as usize;
 
-    // 1. Read salt line (text)
+    // 1. Read salt (text line, not encrypted)
     let mut salt_str = String::new();
-    buf_reader.read_line(&mut salt_str).map_err(|e| e.to_string()).unwrap();
-    let salt = match argon2::password_hash::SaltString::from_b64(salt_str.trim()) {
-      Ok(v) => v,
-      Err(_) => return Err(format!("Can't decrypt file")),
-    };
+    buf_reader.read_line(&mut salt_str).map_err(|e| format!("Failed to read salt: {}", e))?;
+    let salt = argon2::password_hash::SaltString::from_b64(salt_str.trim()).map_err(|e| format!("Invalid salt format: {}", e))?;
 
-    // 2. Read nonce bytes
+    // 2. Read nonce (not encrypted)
     let mut nonce = [0u8; 24];
-    buf_reader.read_exact(&mut nonce).map_err(|e| e.to_string()).unwrap();
+    buf_reader.read_exact(&mut nonce).map_err(|e| format!("Failed to read nonce: {}", e))?;
 
-    // 3. Prepare cipher for decryption
+    // 3. Prepare cipher
     let key = Self::get_key(self.password.clone(), &salt);
-    let mut cipher = chacha20::XChaCha20::new(key.as_bytes().into(), &nonce.into());
+    let cipher = chacha20::XChaCha20::new(key.as_bytes().into(), &nonce.into());
 
-    // 4. Read and decrypt first 2 bytes to get the length
-    let mut first_two = [0u8; 2];
-    buf_reader.read_exact(&mut first_two).map_err(|e| e.to_string()).unwrap();
-    cipher.apply_keystream(&mut first_two);
-
-    // The length is in the second byte
-    let length = first_two[1] as usize;
-
-    // 5. Read the rest of the FileInfo bytes according to length
-    let mut rest = vec![0u8; length];
-    buf_reader.read_exact(&mut rest).map_err(|e| e.to_string()).unwrap();
-    cipher.apply_keystream(&mut rest);
-
-    // 6. Combine the two parts
-    let mut file_info_vec = Vec::with_capacity(2 + length);
-    file_info_vec.extend_from_slice(&first_two);
-    file_info_vec.extend_from_slice(&rest);
-
-    // 7. Parse FileInfo from decrypted bytes
-    let file_info = FileInfo::from_vec(&file_info_vec).unwrap();
-
-    // 8. Wrap the rest of the file in DecryptingReader
+    // 4. Wrap the reader so ALL encrypted bytes come through the decryptor
     let mut decrypting_reader = DecryptingReader::new(buf_reader, cipher);
 
-    // Set up progress tracking
+    // 5. Read and parse header directly from decrypting reader
+    let mut header = [0u8; FILE_HEADER_SIZE];
+    decrypting_reader.read_exact(&mut header).map_err(|e| format!("Failed to read file header: {}", e))?;
+    let file_h = FileHeader::from_vec(&header.to_vec()).map_err(|e| format!("Invalid file header: {}", e))?;
+
+    // 6. Progress tracking (still using the same decrypting_reader)
     if let Some(sender) = self.progress.clone() {
       decrypting_reader.set_progress_sender(sender);
       decrypting_reader.set_total_input_size(file_size);
     }
 
-    // 9. Extract tar archive from decrypted stream
-    let mut tar_archive = tar::Archive::new(decrypting_reader);
-    tar_archive.unpack(&self.output_dir).map_err(|e| e.to_string()).unwrap();
+    if file_h.packed {
+      // 7. Extract tar archive (already positioned after header)
+      let mut tar_archive = tar::Archive::new(decrypting_reader);
+      tar_archive.unpack(&self.output_dir).map_err(|e| format!("Failed to unpack archive: {}", e))?;
+    } else {
+      // 7. Output the single file (already positioned after header)
+      let output_path = self.output_dir.join(&file_h.name);
+      let mut out_file = std::fs::File::create(&output_path).map_err(|e| format!("Failed to create output file at {:?}: {}", output_path, e))?;
 
-    // dbg!(time.elapsed());
+      // Copy all remaining decrypted data into the output file
+      std::io::copy(&mut decrypting_reader, &mut out_file).map_err(|e| format!("Failed to write decrypted file: {}", e))?;
+    }
 
-    Ok(file_info)
+    Ok(())
   }
 
   pub fn benchmark() -> Result<(std::time::Duration, std::time::Duration), String> {
