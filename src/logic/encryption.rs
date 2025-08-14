@@ -375,7 +375,7 @@ impl ShinCrypt {
     let def_output = self.output_dir.join(file_name).with_extension(ENCRYPTION_EXT);
 
     // Create output file with better error handling
-    let mut file_path = if self.input_path == def_output {
+    let file_path = if self.input_path == def_output {
       let mut v = def_output;
       v.set_file_name(format!("{} - new", self.input_path.file_stem().unwrap().to_str().unwrap()));
       v.set_extension(ENCRYPTION_EXT);
@@ -383,8 +383,6 @@ impl ShinCrypt {
     } else {
       def_output
     };
-
-    // file_path.set_extension(ENCRYPTION_EXT);
 
     let mut out_file = std::fs::File::create(&file_path).map_err(|e| format!("Failed to create output file at {:?}: {}", file_path, e))?;
 

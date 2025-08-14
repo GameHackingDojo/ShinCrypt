@@ -150,76 +150,76 @@ impl Global {
   }
 }
 
-pub struct Tar {}
-impl Tar {
-  pub fn tar(path: std::path::PathBuf) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
-    // Create output tar path
-    let tar_path = Self::construct_tar_path(&path)?;
+// pub struct Tar {}
+// impl Tar {
+//   pub fn tar(path: std::path::PathBuf) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+//     // Create output tar path
+//     let tar_path = Self::construct_tar_path(&path)?;
 
-    let file = std::fs::File::create(&tar_path)?;
-    let mut builder = tar::Builder::new(file);
+//     let file = std::fs::File::create(&tar_path)?;
+//     let mut builder = tar::Builder::new(file);
 
-    let base_path = Self::get_base_path(&path)?;
+//     let base_path = Self::get_base_path(&path)?;
 
-    // If the input is a single file, store just that file at the archive root
-    if path.is_file() {
-      let file_name = path.file_name().ok_or_else(|| format!("invalid file name for '{}'", path.display()))?;
-      // append the file so it appears at the archive root with just its filename
-      builder.append_path_with_name(&path, file_name)?;
-    } else {
-      // Append all files/dirs under base_path to the archive root (preserves empty dirs).
-      // Passing "." as the archive-path root places contents at the root of the tar.
-      builder.append_dir_all(".", &base_path)?;
-    }
+//     // If the input is a single file, store just that file at the archive root
+//     if path.is_file() {
+//       let file_name = path.file_name().ok_or_else(|| format!("invalid file name for '{}'", path.display()))?;
+//       // append the file so it appears at the archive root with just its filename
+//       builder.append_path_with_name(&path, file_name)?;
+//     } else {
+//       // Append all files/dirs under base_path to the archive root (preserves empty dirs).
+//       // Passing "." as the archive-path root places contents at the root of the tar.
+//       builder.append_dir_all(".", &base_path)?;
+//     }
 
-    builder.finish()?;
-    Ok(tar_path)
-  }
+//     builder.finish()?;
+//     Ok(tar_path)
+//   }
 
-  pub fn untar(path: std::path::PathBuf) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
-    if !path.is_file() {
-      return Err(format!("'{}' is not a valid tar file", path.display()).into());
-    }
+//   pub fn untar(path: std::path::PathBuf) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+//     if !path.is_file() {
+//       return Err(format!("'{}' is not a valid tar file", path.display()).into());
+//     }
 
-    let target_dir = Self::construct_output_dir(&path)?;
-    std::fs::create_dir_all(&target_dir)?;
+//     let target_dir = Self::construct_output_dir(&path)?;
+//     std::fs::create_dir_all(&target_dir)?;
 
-    let mut f = std::fs::File::open(&path)?;
-    let mut archive = tar::Archive::new(&mut f);
-    archive.unpack(&target_dir)?;
+//     let mut f = std::fs::File::open(&path)?;
+//     let mut archive = tar::Archive::new(&mut f);
+//     archive.unpack(&target_dir)?;
 
-    std::fs::remove_file(&path)?;
-    Ok(target_dir)
-  }
+//     std::fs::remove_file(&path)?;
+//     Ok(target_dir)
+//   }
 
-  fn construct_tar_path(path: &std::path::PathBuf) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
-    let mut p = path.clone();
-    // if path is a file, replace extension, otherwise add .tar
-    if p.is_file() {
-      p.set_extension("tar");
-    } else {
-      // turn "folder" -> "folder.tar"
-      let file_name = p.file_name().ok_or("invalid path")?;
-      let mut out = p.clone();
-      out.set_file_name(format!("{}.tar", file_name.to_string_lossy()));
-      p = out;
-    }
-    Ok(p)
-  }
+//   fn construct_tar_path(path: &std::path::PathBuf) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+//     let mut p = path.clone();
+//     // if path is a file, replace extension, otherwise add .tar
+//     if p.is_file() {
+//       p.set_extension("tar");
+//     } else {
+//       // turn "folder" -> "folder.tar"
+//       let file_name = p.file_name().ok_or("invalid path")?;
+//       let mut out = p.clone();
+//       out.set_file_name(format!("{}.tar", file_name.to_string_lossy()));
+//       p = out;
+//     }
+//     Ok(p)
+//   }
 
-  fn get_base_path(path: &std::path::PathBuf) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> { if path.is_file() { path.parent().map(|p| p.to_path_buf()).ok_or("no parent".into()) } else { Ok(path.clone()) } }
+//   fn get_base_path(path: &std::path::PathBuf) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> { if path.is_file() { path.parent().map(|p| p.to_path_buf()).ok_or("no parent".into()) } else { Ok(path.clone()) } }
 
-  fn construct_output_dir(path: &std::path::PathBuf) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
-    // e.g. "archive.tar" -> "archive"
-    let mut out = path.clone();
-    if let Some(stem) = path.file_stem() {
-      out.set_file_name(stem);
-    } else {
-      out.push(".untarred");
-    }
-    Ok(out)
-  }
-}
+//   fn construct_output_dir(path: &std::path::PathBuf) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+//     // e.g. "archive.tar" -> "archive"
+//     let mut out = path.clone();
+//     if let Some(stem) = path.file_stem() {
+//       out.set_file_name(stem);
+//     } else {
+//       out.push(".untarred");
+//     }
+//     Ok(out)
+//   }
+// }
 
 pub struct GTKhelper {}
 impl GTKhelper {
