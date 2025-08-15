@@ -73,13 +73,13 @@ pub fn gtk_ui() -> gtk::glib::ExitCode {
     let window_c = window.clone();
     let input_c = input.clone();
 
-    let browse_btn = gtk::Button::with_label("📂");
+    let browse_btn = gtk::Button::with_label("📁");
     browse_btn.connect_clicked(move |_| {
       let file_dialog = gtk::FileDialog::new();
-      file_dialog.set_title("Select a directory");
+      file_dialog.set_title("Select a file");
       let input_c = input_c.clone();
 
-      file_dialog.select_folder(Some(&window_c), gtk::gio::Cancellable::NONE, move |result| match result {
+      file_dialog.open(Some(&window_c), gtk::gio::Cancellable::NONE, move |result| match result {
         Ok(v) => input_c.set_text(v.path().unwrap_or_default().to_str().unwrap()),
         Err(err) => eprintln!("Error: {}", err),
       });
