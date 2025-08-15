@@ -62,10 +62,13 @@ impl Global {
     }
 
     let json: serde_json::Value = response.json().map_err(|e| format!("{}{}", ("Failed to parse JSON: "), e))?;
-    let tag_name = json["tag_name"].as_str().unwrap_or_else(|| {
-      println!("{}", ("No tag_name found in JSON."));
-      ""
-    });
+    let tag_name = json["tag_name"]
+      .as_str()
+      .unwrap_or_else(|| {
+        println!("{}", ("No tag_name found in JSON."));
+        ""
+      })
+      .to_string();
 
     if tag_name.is_empty() {
       return Ok(false);
@@ -73,7 +76,7 @@ impl Global {
 
     // println!("{}{}", ("Latest release: "), tag_name);
 
-    let update_available = match Self::compare_versions(&current_version, tag_name) {
+    let update_available = match Self::compare_versions(&current_version, &tag_name) {
       core::cmp::Ordering::Less => {
         println!("{}{}", ("A new version is available: "), tag_name);
         true
@@ -128,6 +131,14 @@ impl Global {
     // Parse the JSON response
     let json: serde_json::Value = response.json().map_err(|e| format!("{}{}", ("Failed to parse JSON: "), e))?;
 
+    let tag_name = json["tag_name"]
+      .as_str()
+      .unwrap_or_else(|| {
+        println!("{}", ("No tag_name found in JSON."));
+        ""
+      })
+      .to_string();
+
     // println!("{}{}", ("JSON Response: "), json);
     // println!("{}{}", ("Looking for asset: "), asset_name);
 
@@ -146,7 +157,7 @@ impl Global {
     let mut file = std::fs::File::create(&asset_name).map_err(|e| format!("{}{}", ("Failed to create file: "), e))?;
     std::io::copy(&mut response, &mut file).map_err(|e| format!("{}{}", ("Failed to write file: "), e))?;
 
-    Ok(format!("{}{}{}", ("Downloaded "), &asset_name, (" successfully!")))
+    Ok(format!("Downloaded {} v{} successfully!", &asset_name, tag_name))
   }
 
   fn prepare_update_file() -> Result<(), String> {
