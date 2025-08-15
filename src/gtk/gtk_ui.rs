@@ -159,7 +159,6 @@ pub fn gtk_ui() -> gtk::glib::ExitCode {
 
     let window_c = window.clone();
     let grid_c = grid.clone();
-    let progress_c = progress.clone();
     let input_c = input.clone();
     let output_c = output.clone();
     let password_c = password.clone();
@@ -213,13 +212,11 @@ pub fn gtk_ui() -> gtk::glib::ExitCode {
         Err(e) => e_res_s_c_c.send(e),
       });
 
-      progress_c.set_fraction(0.0);
       password_c.set_text("");
     });
 
     let window_c = window.clone();
     let grid_c = grid.clone();
-    let progress_c = progress.clone();
     let input_c = input.clone();
     let output_c = output.clone();
     let password_c = password.clone();
@@ -273,7 +270,6 @@ pub fn gtk_ui() -> gtk::glib::ExitCode {
         Err(e) => d_res_s_c_c.send(e),
       });
 
-      progress_c.set_fraction(0.0);
       password_c.set_text("");
     });
 
@@ -301,6 +297,7 @@ pub fn gtk_ui() -> gtk::glib::ExitCode {
 
       if let Ok(e_res) = e_res_r.try_recv() {
         grid_c.set_sensitive(true);
+        progress_c.set_fraction(0.0);
         if e_res == "Success" {
           if aps_c.read().settings.remove_org {
             if let Err(e) = Global::del_path(input_path.clone()) {
@@ -316,6 +313,7 @@ pub fn gtk_ui() -> gtk::glib::ExitCode {
 
       if let Ok(d_res) = d_res_r.try_recv() {
         grid_c.set_sensitive(true);
+        progress_c.set_fraction(0.0);
         if d_res == "Success" {
           if aps_c.read().settings.remove_org {
             if let Err(e) = Global::del_path(input_path.clone()) {
