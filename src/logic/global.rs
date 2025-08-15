@@ -148,6 +148,21 @@ impl Global {
 
     Ok(())
   }
+
+  /// deletes given PathBuf whather it's file or directory
+  pub fn del_path(path: std::path::PathBuf) -> Result<(), String> {
+    if path.is_file() {
+      if let Err(e) = std::fs::remove_file(path.clone()) {
+        return Err(format!("File can't be deleted\n{}", e));
+      }
+    } else if path.is_dir() {
+      if let Err(e) = std::fs::remove_dir_all(path.clone()) {
+        return Err(format!("Directory can't be deleted\n{}", e));
+      }
+    }
+
+    Ok(())
+  }
 }
 
 // pub struct Tar {}

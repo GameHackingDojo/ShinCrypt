@@ -1,4 +1,4 @@
-use crate::{AppState, gtk::settings_win::{AppSettings, settings_ui}, logic::{encryption::ShinCrypt, global::GTKhelper}};
+use crate::{AppState, gtk::settings_win::{AppSettings, settings_ui}, logic::{encryption::ShinCrypt, global::{GTKhelper, Global}}};
 use gtk::prelude::*;
 use gtk4 as gtk;
 use parking_lot::RwLock;
@@ -213,20 +213,6 @@ pub fn gtk_ui() -> gtk::glib::ExitCode {
         Err(e) => e_res_s_c_c.send(e),
       });
 
-      if aps_c.read().settings.remove_org {
-        if input_path.is_file() {
-          if let Err(e) = std::fs::remove_file(input_path) {
-            GTKhelper::message_box(&window_c, "Error", format!("File doesn't exist\n{}", e), None);
-            return;
-          }
-        } else if input_path.is_dir() {
-          if let Err(e) = std::fs::remove_dir_all(input_path) {
-            GTKhelper::message_box(&window_c, "Error", format!("Directory doesn't exist\n{}", e), None);
-            return;
-          }
-        }
-      }
-
       progress_c.set_fraction(0.0);
       password_c.set_text("");
     });
@@ -287,22 +273,7 @@ pub fn gtk_ui() -> gtk::glib::ExitCode {
         Err(e) => d_res_s_c_c.send(e),
       });
 
-      if aps_c.read().settings.remove_org {
-        if input_path.is_file() {
-          if let Err(e) = std::fs::remove_file(input_path) {
-            GTKhelper::message_box(&window_c, "Error", format!("File doesn't exist\n{}", e), None);
-            return;
-          }
-        } else if input_path.is_dir() {
-          if let Err(e) = std::fs::remove_dir_all(input_path) {
-            GTKhelper::message_box(&window_c, "Error", format!("Directory doesn't exist\n{}", e), None);
-            return;
-          }
-        }
-      }
-
       progress_c.set_fraction(0.0);
-
       password_c.set_text("");
     });
 
@@ -310,6 +281,7 @@ pub fn gtk_ui() -> gtk::glib::ExitCode {
     let window_c = window.clone();
     let grid_c = grid.clone();
     let progress_c = progress.clone();
+    let input_c = input.clone();
     let output_c = output.clone();
     let browse_o_btn_c = browse_o_btn.clone();
 
@@ -323,9 +295,19 @@ pub fn gtk_ui() -> gtk::glib::ExitCode {
         progress_c.set_fraction(prog);
       }
 
+      let mut input_v = input_c.text().to_string();
+      input_v.retain(|c| c != '"' && c != '\'');
+      let input_path = std::path::PathBuf::from(input_v);
+
       if let Ok(e_res) = e_res_r.try_recv() {
         grid_c.set_sensitive(true);
         if e_res == "Success" {
+          if aps_c.read().settings.remove_org {
+            if let Err(e) = Global::del_path(input_path.clone()) {
+              GTKhelper::message_box(&window_c, "Error", e, None);
+            };
+          }
+
           GTKhelper::message_box(&window_c, e_res, "File encrypted", None);
         } else {
           GTKhelper::message_box(&window_c, "Failed", e_res, None);
@@ -335,6 +317,12 @@ pub fn gtk_ui() -> gtk::glib::ExitCode {
       if let Ok(d_res) = d_res_r.try_recv() {
         grid_c.set_sensitive(true);
         if d_res == "Success" {
+          if aps_c.read().settings.remove_org {
+            if let Err(e) = Global::del_path(input_path.clone()) {
+              GTKhelper::message_box(&window_c, "Error", e, None);
+            };
+          }
+
           GTKhelper::message_box(&window_c, d_res, "File decrypted", None);
         } else {
           GTKhelper::message_box(&window_c, "Failed", d_res, None);
@@ -343,8 +331,6 @@ pub fn gtk_ui() -> gtk::glib::ExitCode {
 
       gtk::glib::ControlFlow::Continue
     });
-
-    // let window_c = window.clone();
 
     window.present();
 
