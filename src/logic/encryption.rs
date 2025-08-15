@@ -3,13 +3,13 @@ use argon2::password_hash::PasswordHasher;
 use chacha20::cipher::{KeyIvInit, StreamCipher};
 use std::{io::{BufRead, Read, Write}, u16};
 
-static FILE_HEADER_SIZE: usize = 1024 * 1024; // 1 MB
+static SIZE_1MB: usize = 1024 * 1024;
+
+static FILE_HEADER_SIZE: usize = SIZE_1MB; // 1 MB
 
 static FILE_1GB: usize = 1024 * 1024 * 1024; // 1 GB
-static CHUNK_1MB: usize = 1024 * 1024; // 1 MB
+static CHUNK: usize = SIZE_1MB; // 1 MB
 // static CHUNK_4KB: usize = 0x1000; // 4 KB
-
-static CHUNK: usize = CHUNK_1MB;
 
 static NONCE_SIZE: usize = 24;
 static ENCRYPTION_EXT: &str = "snc";
@@ -555,37 +555,47 @@ impl ShinCrypt {
   }
 
   pub fn benchmark() -> Result<(std::time::Duration, std::time::Duration), String> {
-    let path = match Self::gen_file() {
-      Ok(v) => v,
-      Err(e) => return Err(e),
-    };
+    std::thread::Builder::new()
+      .stack_size(SIZE_1MB * 4)
+      .spawn(|| {
+        let path = match Self::gen_file() {
+          Ok(v) => v,
+          Err(e) => return Err(e),
+        };
 
-    let output_dir = path.parent().unwrap();
+        let output_dir = path.parent().unwrap();
 
-    let encrypt_time = {
-      let time = std::time::Instant::now();
+        let encrypt_time = {
+          let time = std::time::Instant::now();
 
-      let shincrypt = ShinCrypt::new(&path, output_dir, APPNAME, None);
-      shincrypt.encrypt_file().unwrap();
+          let shincrypt = ShinCrypt::new(&path, output_dir, APPNAME, None);
+          if let Err(e) = shincrypt.encrypt_file() {
+            println!("{}", e);
+          };
 
-      time.elapsed()
-    };
+          time.elapsed()
+        };
 
-    let mut input_path = path.clone();
-    input_path.set_extension(ENCRYPTION_EXT);
+        let mut input_path = path.clone();
+        input_path.set_extension(ENCRYPTION_EXT);
 
-    let decrypt_time = {
-      let time = std::time::Instant::now();
+        let decrypt_time = {
+          let time = std::time::Instant::now();
 
-      let shincrypt = ShinCrypt::new(input_path, output_dir, APPNAME, None);
-      shincrypt.decrypt_file().unwrap();
+          let shincrypt = ShinCrypt::new(input_path, output_dir, APPNAME, None);
+          if let Err(e) = shincrypt.decrypt_file() {
+            println!("{}", e);
+          };
 
-      time.elapsed()
-    };
+          time.elapsed()
+        };
 
-    std::fs::remove_dir_all(output_dir).unwrap();
-
-    Ok((encrypt_time, decrypt_time))
+        std::fs::remove_dir_all(output_dir).unwrap();
+        Ok((encrypt_time, decrypt_time))
+      })
+      .unwrap()
+      .join()
+      .unwrap()
   }
 
   fn gen_file() -> Result<std::path::PathBuf, String> {
@@ -601,6 +611,7 @@ impl ShinCrypt {
 
     getrandom::fill(&mut buffer).unwrap();
     file_buf.write_all(&buffer).unwrap();
+
     Ok(file_path)
   }
 }
