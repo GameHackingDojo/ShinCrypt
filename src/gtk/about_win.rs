@@ -37,7 +37,7 @@ pub fn about_win(window: &gtk::ApplicationWindow, aps: Arc<RwLock<AppState>>) {
   let window_c = window.clone();
   let aps_c = aps.clone();
 
-  let update_btn = gtk::Button::with_label("Update");
+  let update_btn = gtk::Button::with_label("Update 🔄");
   update_btn.connect_clicked(move |_| {
     match Global::check_for_update(aps_c.clone()) {
       Ok(v) => {
@@ -64,7 +64,7 @@ pub fn about_win(window: &gtk::ApplicationWindow, aps: Arc<RwLock<AppState>>) {
 
   let url_c = url.clone();
 
-  let support_btn = gtk::Button::with_label("Support");
+  let support_btn = gtk::Button::with_label("Support 🙏");
   support_btn.connect_clicked(move |_| webbrowser::open(&url_c).unwrap());
 
   // let controller = gtk::EventControllerLegacy::new();

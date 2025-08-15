@@ -98,7 +98,7 @@ pub fn settings_ui(window: &gtk4::ApplicationWindow, aps: Arc<RwLock<AppState>>)
   {
     let window_c = window.clone();
 
-    let benchmark_btn = gtk4::Button::with_label("Benchmark");
+    let benchmark_btn = gtk4::Button::with_label("Benchmark 🚝");
     benchmark_btn.set_hexpand(true);
     benchmark_btn.connect_clicked(move |_| {
       match ShinCrypt::benchmark() {
@@ -113,7 +113,7 @@ pub fn settings_ui(window: &gtk4::ApplicationWindow, aps: Arc<RwLock<AppState>>)
     let window_c = window.clone();
     let aps_c = aps.clone();
 
-    let about_btn = gtk4::Button::with_label("About");
+    let about_btn = gtk4::Button::with_label("About ℹ️");
     about_btn.set_hexpand(true);
     about_btn.connect_clicked(move |_| {
       about_win(&window_c, aps_c.clone());

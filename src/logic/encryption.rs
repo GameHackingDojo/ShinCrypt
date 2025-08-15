@@ -1,10 +1,9 @@
 use crate::{APPNAME, logic::global::FileDir};
 use argon2::password_hash::PasswordHasher;
 use chacha20::cipher::{KeyIvInit, StreamCipher};
+use std::{io::{BufRead, Read, Write}, u16};
 
-use std::io::{BufRead, Read, Write};
-
-static FILE_HEADER_SIZE: usize = 1024 * 4; // 4 KB
+static FILE_HEADER_SIZE: usize = 1024 * 1024; // 1 MB
 
 static FILE_1GB: usize = 1024 * 1024 * 1024; // 1 GB
 static CHUNK_1MB: usize = 1024 * 1024; // 1 MB
@@ -271,28 +270,52 @@ impl FileHeader {
     let mut pos = 0; // Track current write position
     let var_size = size_of::<u16>();
 
-    let packed = u16::from_le_bytes(vec[pos..pos + var_size].try_into()?) != 0;
+    let packed_slice = if let Some(slice) = vec.get(pos..pos + var_size) { slice } else { return Err("Failed to get slice".into()) };
+
+    let packed = u16::from_le_bytes(packed_slice.try_into()?) != 0;
     pos += var_size;
 
-    let file = u16::from_le_bytes(vec[pos..pos + var_size].try_into()?) != 0;
+    let file_slice = if let Some(slice) = vec.get(pos..pos + var_size) { slice } else { return Err("Failed to get slice".into()) };
+
+    let file = u16::from_le_bytes(file_slice.try_into()?) != 0;
     pos += var_size;
 
-    let version = u16::from_le_bytes(vec[pos..pos + var_size].try_into()?);
+    let version_slice = if let Some(slice) = vec.get(pos..pos + var_size) { slice } else { return Err("Failed to get slice".into()) };
+
+    let version = u16::from_le_bytes(version_slice.try_into()?);
     pos += var_size;
 
-    let encryption_num = u16::from_le_bytes(vec[pos..pos + var_size].try_into()?);
+    let encryption_num_slice = if let Some(slice) = vec.get(pos..pos + var_size) { slice } else { return Err("Failed to get slice".into()) };
+
+    let encryption_num = u16::from_le_bytes(encryption_num_slice.try_into()?);
     pos += var_size;
 
-    let name_len = u16::from_le_bytes(vec[pos..pos + var_size].try_into()?) as usize;
+    let name_len_slice = if let Some(slice) = vec.get(pos..pos + var_size) { slice } else { return Err("Failed to get slice".into()) };
+
+    let name_len = u16::from_le_bytes(name_len_slice.try_into()?) as usize;
     pos += var_size;
 
-    let name = String::from_utf8(vec[pos..pos + name_len].to_vec()).map_err(|_| "Invalid UTF-8 in name")?;
+    let name_slice = if let Some(slice) = vec.get(pos..pos + name_len) { slice } else { return Err("Failed to get slice".into()) };
+
+    let name = match String::from_utf8(name_slice.to_vec()) {
+      Ok(v) => v,
+      Err(e) => return Err(format!("Invalid UTF-8 in name {}", e).into()),
+    };
     pos += name_len;
 
-    let path_len = u16::from_le_bytes(vec[pos..pos + var_size].try_into()?) as usize;
+    let path_slice = if let Some(slice) = vec.get(pos..pos + var_size) { slice } else { return Err("Failed to get slice".into()) };
+
+    let path_len = u16::from_le_bytes(path_slice.try_into()?) as usize;
     pos += var_size;
 
-    let path = std::path::PathBuf::from(String::from_utf8(vec[pos..pos + path_len].to_vec()).map_err(|_| "Invalid UTF-8 in name")?);
+    let path_slice = if let Some(slice) = vec.get(pos..pos + path_len) { slice } else { return Err("Failed to get slice".into()) };
+
+    let path_str = match String::from_utf8(path_slice.to_vec()).map_err(|_| "Invalid UTF-8 in name") {
+      Ok(v) => v,
+      Err(e) => return Err(format!("Invalid UTF-8 in name {}", e).into()),
+    };
+
+    let path = std::path::PathBuf::from(path_str);
     pos += path_len;
 
     let encryption = EncMethod::from_u16(encryption_num).ok_or("Invalid encryption method")?;
@@ -384,15 +407,27 @@ impl ShinCrypt {
       def_output
     };
 
-    let mut out_file = std::fs::File::create(&file_path).map_err(|e| format!("Failed to create output file at {:?}: {}", file_path, e))?;
+    let mut out_file = match std::fs::File::create(&file_path) {
+      Ok(v) => v,
+      Err(e) => return Err(format!("Failed to create output file at {:?}: {}", file_path, e)),
+    };
 
     // Write salt + nonce with error handling
-    writeln!(out_file, "{}", salt.as_str()).map_err(|e| format!("Failed to write salt: {}", e))?;
-    out_file.write_all(&nonce).map_err(|e| format!("Failed to write nonce: {}", e))?;
+    match writeln!(out_file, "{}", salt.as_str()) {
+      Ok(v) => v,
+      Err(e) => return Err(format!("Failed to write salt: {}", e)),
+    };
+    match out_file.write_all(&nonce) {
+      Ok(v) => v,
+      Err(e) => return Err(format!("Failed to write nonce: {}", e)),
+    };
 
     // Write encrypted file info
     cipher.apply_keystream(&mut file_h_vec);
-    out_file.write_all(&file_h_vec).map_err(|e| format!("Failed to write file header: {}", e))?;
+    match out_file.write_all(&file_h_vec) {
+      Ok(v) => v,
+      Err(e) => return Err(format!("Failed to write file header: {}", e)),
+    };
 
     // Create an encrypting writer that wraps the output file
     let mut encrypting_writer = EncryptingWriter::new(out_file, cipher);
@@ -410,25 +445,43 @@ impl ShinCrypt {
 
       let result = if self.input_path.is_dir() { tar_builder.append_dir_all(file_name, &self.input_path) } else { tar_builder.append_path_with_name(&self.input_path, file_name) };
 
-      result.map_err(|e| format!("Failed to add files to archive: {}", e))?;
+      match result {
+        Ok(v) => v,
+        Err(e) => return Err(format!("Failed to add files to archive: {}", e)),
+      };
 
-      tar_builder.finish().map_err(|e| format!("Failed to finalize archive: {}", e))?;
+      match tar_builder.finish() {
+        Ok(v) => v,
+        Err(e) => return Err(format!("Failed to finalize archive: {}", e)),
+      };
     } else {
       // Open input file for reading
-      let mut in_file = std::fs::File::open(&self.input_path).map_err(|e| format!("Failed to open input file: {}", e))?;
+      let mut in_file = match std::fs::File::open(&self.input_path) {
+        Ok(v) => v,
+        Err(e) => return Err(format!("Failed to open input file: {}", e)),
+      };
 
       // Stream the input file through the encrypting writer
-      std::io::copy(&mut in_file, &mut encrypting_writer).map_err(|e| format!("Failed to write encrypted file: {}", e))?;
+      match std::io::copy(&mut in_file, &mut encrypting_writer) {
+        Ok(v) => v,
+        Err(e) => return Err(format!("Failed to write encrypted file: {}", e)),
+      };
     }
 
-    encrypting_writer.flush().map_err(|e| format!("Failed to flush writer: {}", e))?;
+    match encrypting_writer.flush() {
+      Ok(v) => v,
+      Err(e) => return Err(format!("Failed to flush writer: {}", e)),
+    };
 
     Ok(())
   }
 
   pub fn decrypt_file(&self) -> Result<(), String> {
     // Open input file
-    let mut in_file = std::fs::File::open(&self.input_path).map_err(|e| format!("Failed to open input file: {}", e))?;
+    let mut in_file = match std::fs::File::open(&self.input_path) {
+      Ok(v) => v,
+      Err(e) => return Err(format!("Failed to open input file: {}", e)),
+    };
     let mut buf_reader = std::io::BufReader::new(&mut in_file);
 
     // File size for progress
@@ -436,12 +489,21 @@ impl ShinCrypt {
 
     // 1. Read salt (text line, not encrypted)
     let mut salt_str = String::new();
-    buf_reader.read_line(&mut salt_str).map_err(|e| format!("Failed to read salt: {}", e))?;
-    let salt = argon2::password_hash::SaltString::from_b64(salt_str.trim()).map_err(|e| format!("Invalid salt format: {}", e))?;
+    match buf_reader.read_line(&mut salt_str) {
+      Ok(v) => v,
+      Err(e) => return Err(format!("Failed to read salt: {}", e)),
+    };
+    let salt = match argon2::password_hash::SaltString::from_b64(salt_str.trim()) {
+      Ok(v) => v,
+      Err(e) => return Err(format!("Invalid salt format: {}", e)),
+    };
 
     // 2. Read nonce (not encrypted)
     let mut nonce = [0u8; 24];
-    buf_reader.read_exact(&mut nonce).map_err(|e| format!("Failed to read nonce: {}", e))?;
+    match buf_reader.read_exact(&mut nonce) {
+      Ok(v) => v,
+      Err(e) => return Err(format!("Failed to read nonce: {}", e)),
+    };
 
     // 3. Prepare cipher
     let key = Self::get_key(self.password.clone(), &salt);
@@ -452,8 +514,14 @@ impl ShinCrypt {
 
     // 5. Read and parse header directly from decrypting reader
     let mut header = [0u8; FILE_HEADER_SIZE];
-    decrypting_reader.read_exact(&mut header).map_err(|e| format!("Failed to read file header: {}", e))?;
-    let file_h = FileHeader::from_vec(&header.to_vec()).map_err(|e| format!("Invalid file header: {}", e))?;
+    match decrypting_reader.read_exact(&mut header) {
+      Ok(v) => v,
+      Err(e) => return Err(format!("Failed to read file header: {}", e)),
+    };
+    let file_h = match FileHeader::from_vec(&header.to_vec()) {
+      Ok(v) => v,
+      Err(e) => return Err(format!("Invalid file header: {}", e)),
+    };
 
     // 6. Progress tracking (still using the same decrypting_reader)
     if let Some(sender) = self.progress.clone() {
@@ -464,14 +532,23 @@ impl ShinCrypt {
     if file_h.packed {
       // 7. Extract tar archive (already positioned after header)
       let mut tar_archive = tar::Archive::new(decrypting_reader);
-      tar_archive.unpack(&self.output_dir).map_err(|e| format!("Failed to unpack archive: {}", e))?;
+      match tar_archive.unpack(&self.output_dir) {
+        Ok(v) => v,
+        Err(e) => return Err(format!("Failed to unpack archive: {}", e)),
+      };
     } else {
       // 7. Output the single file (already positioned after header)
       let output_path = self.output_dir.join(&file_h.name);
-      let mut out_file = std::fs::File::create(&output_path).map_err(|e| format!("Failed to create output file at {:?}: {}", output_path, e))?;
+      let mut out_file = match std::fs::File::create(&output_path) {
+        Ok(v) => v,
+        Err(e) => return Err(format!("Failed to create output file at {:?}: {}", output_path, e)),
+      };
 
       // Copy all remaining decrypted data into the output file
-      std::io::copy(&mut decrypting_reader, &mut out_file).map_err(|e| format!("Failed to write decrypted file: {}", e))?;
+      match std::io::copy(&mut decrypting_reader, &mut out_file) {
+        Ok(v) => v,
+        Err(e) => return Err(format!("Failed to write decrypted file: {}", e)),
+      };
     }
 
     Ok(())
