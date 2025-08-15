@@ -43,7 +43,7 @@ pub fn about_win(window: &gtk::ApplicationWindow, aps: Arc<RwLock<AppState>>) {
       Ok(v) => {
         if v {
           match Global::download_latest_version(aps_c.clone()) {
-            Ok(_) => (),
+            Ok(v) => GTKhelper::message_box(&window_c, "Success", format!("{}", v), None),
             Err(e) => GTKhelper::message_box(&window_c, "Error", format!("{}", e), None),
           }
         } else {

@@ -1,10 +1,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use crate::gtk::settings_win::AppSettings;
+use crate::{gtk::settings_win::AppSettings, logic::global::Global};
 mod gtk;
 mod logic;
 
 const APPNAME: &str = "ShinCrypt";
+const OLDAPPNAME: &str = "old_GHD_app";
 
 #[derive(Clone, Default)]
 pub struct AppState {
@@ -56,6 +57,11 @@ impl Default for AppConsts {
 // const ICON_BYTES: &[u8] = if cfg!(target_os = "windows") { include_bytes!("../resources/icon.ico") } else { include_bytes!("../resources/icon.png") };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+  let old_app = std::env::current_exe().unwrap().parent().unwrap().join(OLDAPPNAME);
+  if old_app.exists() {
+    Global::del_path(old_app).unwrap()
+  }
+
   gtk::gtk_ui::gtk_ui();
   Ok(())
 }

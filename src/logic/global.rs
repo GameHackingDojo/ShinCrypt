@@ -1,4 +1,4 @@
-use crate::AppState;
+use crate::{AppState, OLDAPPNAME};
 use gtk::{gdk::prelude::DisplayExt, prelude::*};
 use gtk4 as gtk;
 use parking_lot::RwLock;
@@ -108,7 +108,7 @@ impl Global {
     current_parts.cmp(&latest_parts)
   }
 
-  pub fn download_latest_version(aps: Arc<RwLock<AppState>>) -> Result<(), String> {
+  pub fn download_latest_version(aps: Arc<RwLock<AppState>>) -> Result<String, String> {
     let asset_name = aps.read().consts.file_name.clone();
     // println!("{}{}", ("file name = "), asset_name);
     let url = aps.read().consts.download_url.clone();
@@ -140,11 +140,21 @@ impl Global {
     // Download the asset
     let mut response = client.get(download_url).header("User-Agent", "Rust-Reqwest").send().map_err(|e| format!("{}{}", ("Failed to download asset: "), e))?;
 
+    Self::prepare_update_file().unwrap();
+
     // Write the file to disk
     let mut file = std::fs::File::create(&asset_name).map_err(|e| format!("{}{}", ("Failed to create file: "), e))?;
     std::io::copy(&mut response, &mut file).map_err(|e| format!("{}{}", ("Failed to write file: "), e))?;
 
-    println!("{}{}{}", ("Downloaded "), &asset_name, (" successfully!"));
+    Ok(format!("{}{}{}", ("Downloaded "), &asset_name, (" successfully!")))
+  }
+
+  fn prepare_update_file() -> Result<(), String> {
+    let cur_path = std::env::current_exe().unwrap();
+    let old_path = cur_path.with_file_name(OLDAPPNAME);
+    if let Err(e) = std::fs::rename(&cur_path, &old_path) {
+      return Err(format!("Failed to rename file, error: {}", e));
+    };
 
     Ok(())
   }
