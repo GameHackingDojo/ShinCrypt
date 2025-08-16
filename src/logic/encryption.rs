@@ -520,7 +520,8 @@ impl ShinCrypt {
     };
     let file_h = match FileHeader::from_vec(&header.to_vec()) {
       Ok(v) => v,
-      Err(e) => return Err(format!("Invalid file header: {}", e)),
+      // Err(e) => return Err(format!("Invalid file header: {}", e)),
+      Err(_) => return Err(format!("Wrong password")),
     };
 
     // 6. Progress tracking (still using the same decrypting_reader)

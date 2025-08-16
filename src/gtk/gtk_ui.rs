@@ -65,7 +65,7 @@ pub fn gtk_ui() -> gtk::glib::ExitCode {
 
     // Row 0: Input + Browse
     let input = gtk::Entry::new();
-    input.set_placeholder_text(Some("Input"));
+    input.set_placeholder_text(Some("Path to file/directory"));
     input.set_hexpand(true);
 
     GTKhelper::drag_n_drop(&input);
@@ -73,8 +73,9 @@ pub fn gtk_ui() -> gtk::glib::ExitCode {
     let window_c = window.clone();
     let input_c = input.clone();
 
-    let browse_btn = gtk::Button::with_label("📁");
-    browse_btn.connect_clicked(move |_| {
+    let browse_i_btn = gtk::Button::with_label("📁");
+    browse_i_btn.set_tooltip_text(Some("Select file"));
+    browse_i_btn.connect_clicked(move |_| {
       let file_dialog = gtk::FileDialog::new();
       file_dialog.set_title("Select a file");
       let input_c = input_c.clone();
@@ -86,13 +87,13 @@ pub fn gtk_ui() -> gtk::glib::ExitCode {
     });
 
     grid.attach(&input, 0, 1, 2, 1);
-    grid.attach(&browse_btn, 2, 1, 1, 1);
+    grid.attach(&browse_i_btn, 2, 1, 1, 1);
 
     let same_dir = aps.read().settings.same_dir;
 
     // Row 0: Input + Browse
     let output = gtk::Entry::new();
-    output.set_placeholder_text(Some("Output"));
+    output.set_placeholder_text(Some("Path to output directory"));
     output.set_hexpand(true);
     output.set_sensitive(!same_dir);
 
@@ -102,6 +103,7 @@ pub fn gtk_ui() -> gtk::glib::ExitCode {
     let output_c = output.clone();
 
     let browse_o_btn = gtk::Button::with_label("📂");
+    browse_o_btn.set_tooltip_text(Some("Select directory"));
     browse_o_btn.connect_clicked(move |_| {
       let file_dialog = gtk::FileDialog::new();
       file_dialog.set_title("Select a directory");
@@ -128,6 +130,7 @@ pub fn gtk_ui() -> gtk::glib::ExitCode {
 
     let password_c = password.clone();
     let pw_toggle = gtk::Button::with_label("👁️");
+    pw_toggle.set_tooltip_text(Some("Toggle password visbility"));
     pw_toggle.connect_clicked(move |_| {
       let visible = !gtk::prelude::EntryExt::is_visible(&password_c);
       gtk::prelude::EntryExt::set_visibility(&password_c, visible);
@@ -136,12 +139,12 @@ pub fn gtk_ui() -> gtk::glib::ExitCode {
     grid.attach(&password, 0, 3, 2, 1);
     grid.attach(&pw_toggle, 2, 3, 1, 1);
 
-    // Row 2: (empty cell) + Settings button
-    let settings_btn = gtk::Button::with_label("⚙️");
-
     let aps_c = aps.clone();
     let window_c = window.clone();
 
+    // Row 2: (empty cell) + Settings button
+    let settings_btn = gtk::Button::with_label("⚙️");
+    settings_btn.set_tooltip_text(Some("Settings"));
     settings_btn.connect_clicked(move |_| {
       settings_ui(&window_c, aps_c.clone());
     });
