@@ -6,6 +6,7 @@ mod logic;
 
 const APPNAME: &str = "ShinCrypt";
 const OLDAPPNAME: &str = "old_GHD_app";
+static SIZE_1MB: usize = 1024 * 1024;
 
 #[derive(Clone, Default)]
 pub struct AppState {
@@ -20,7 +21,7 @@ pub struct AppConsts {
   pub version: String,
   pub author: String,
   pub repo_owner: String,
-  pub repository: String,
+  pub github_repo: String,
   pub download_url: String,
   pub patreon_url: String,
 
@@ -35,8 +36,8 @@ impl Default for AppConsts {
     let version = String::from(env!("CARGO_PKG_VERSION"));
     let author = String::from("Game Hacking Dojo");
     let repo_owner = String::from("GameHackingDojo");
-    let repository = app_name.clone();
-    let download_url = format!("https://api.github.com/repos/{}/{}/releases/latest", repo_owner, repository);
+    let github_repo = format!("https://github.com/{}/{}", repo_owner, app_name);
+    let download_url = format!("https://api.github.com/repos/{}/{}/releases/latest", repo_owner, app_name);
     let patreon_url = format!("https://www.patreon.com/c/{}", repo_owner);
 
     return Self {
@@ -47,7 +48,7 @@ impl Default for AppConsts {
       version,
       author,
       repo_owner,
-      repository,
+      github_repo,
       download_url,
       patreon_url,
     };

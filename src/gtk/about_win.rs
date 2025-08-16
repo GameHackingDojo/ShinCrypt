@@ -17,6 +17,7 @@ pub fn about_win(window: &gtk::ApplicationWindow, aps: Arc<RwLock<AppState>>) {
 
   let author = aps.read().consts.author.clone();
   let version = aps.read().consts.version.clone();
+  let repo = aps.read().consts.github_repo.clone();
   let text = format!("Made by the\n{}\nThank you for your support\n\n{}", author, version);
 
   let about = gtk::Label::new(Some(&text));
@@ -26,27 +27,42 @@ pub fn about_win(window: &gtk::ApplicationWindow, aps: Arc<RwLock<AppState>>) {
 
   grid.attach(&about, 0, 0, 2, 1);
 
+  {
+    let repo_lbl = gtk::Label::new(Some(&repo));
+    repo_lbl.set_css_classes(&["link"]);
+    repo_lbl.set_justify(gtk::Justification::Center);
+    repo_lbl.set_halign(gtk::Align::Center);
+
+    let click = gtk::GestureClick::new();
+    click.connect_released(move |_, _, _, _| webbrowser::open(&repo).unwrap());
+
+    let cursor = gtk::gdk::Cursor::from_name("pointer", None).unwrap();
+    repo_lbl.set_cursor(Some(&cursor));
+
+    repo_lbl.add_controller(click);
+
+    grid.attach(&repo_lbl, 0, 1, 2, 1);
+  }
+
   let window_c = window.clone();
   let aps_c = aps.clone();
 
   let update_btn = gtk::Button::with_label("Update 🔄");
-  update_btn.connect_clicked(move |_| {
-    match Global::check_for_update(aps_c.clone()) {
-      Ok(v) => {
-        if v {
-          match Global::download_latest_version(aps_c.clone()) {
-            Ok(v) => GTKhelper::message_box(&window_c, "Success", format!("{}", v), None),
-            Err(e) => GTKhelper::message_box(&window_c, "Error", format!("{}", e), None),
-          }
-        } else {
-          GTKhelper::message_box(&window_c, "No updates", "No updates are currently available\nThis is the latest version\n\n", None);
-        }
+  update_btn.connect_clicked(move |_| match Global::check_for_update(aps_c.clone()) {
+    Ok(v) => {
+      if v {
+        match Global::download_latest_version(aps_c.clone()) {
+          Ok(v) => GTKhelper::message_box(&window_c, "Success", format!("{}", v), None),
+          Err(e) => GTKhelper::message_box(&window_c, "Error", format!("{}", e), None),
+        };
+      } else {
+        GTKhelper::message_box(&window_c, "No updates", "You're using the latest version\n\n", None);
       }
-      Err(e) => println!("{}{}", ("error"), e),
-    };
+    }
+    Err(e) => println!("{}{}", ("error"), e),
   });
 
-  grid.attach(&update_btn, 0, 1, 1, 1);
+  grid.attach(&update_btn, 0, 2, 1, 1);
 
   let url = aps.read().consts.patreon_url.clone();
   let support_btn = gtk::Button::with_label("Support 🙏");
@@ -87,7 +103,7 @@ pub fn about_win(window: &gtk::ApplicationWindow, aps: Arc<RwLock<AppState>>) {
   // Attach the controller to our button
   // support_btn.add_controller(controller);
 
-  grid.attach(&support_btn, 1, 1, 1, 1);
+  grid.attach(&support_btn, 1, 2, 1, 1);
 
   settings_win.present();
 }

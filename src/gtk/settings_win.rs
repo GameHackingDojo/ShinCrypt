@@ -1,4 +1,4 @@
-use crate::{AppState, gtk::{about_win::about_win, gtk_ui::MarginAll}, logic::{encryption::ShinCrypt, global::{GTKhelper, Global}}};
+use crate::{AppState, SIZE_1MB, gtk::{about_win::about_win, gtk_ui::MarginAll}, logic::{encryption::ShinCrypt, global::{GTKhelper, Global}}};
 use gtk4::prelude::*;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
@@ -101,7 +101,7 @@ pub fn settings_ui(window: &gtk4::ApplicationWindow, aps: Arc<RwLock<AppState>>)
     let benchmark_btn = gtk4::Button::with_label("Benchmark 🚝");
     benchmark_btn.set_hexpand(true);
     benchmark_btn.connect_clicked(move |_| {
-      match ShinCrypt::benchmark() {
+      match std::thread::Builder::new().stack_size(SIZE_1MB * 4).spawn(|| ShinCrypt::benchmark()).unwrap().join().unwrap() {
         Ok((e_time, d_time)) => GTKhelper::message_box(&window_c, "Done", format!("Encrypted 1GB:\n\nTime: {}\nSpeed: {:.2} MB/s\n\nDecrypted 1GB:\n\nTime: {}\nSpeed: {:.2} MB/s\n", Global::format_duration(e_time), Global::calculate_speed(1.0, e_time), Global::format_duration(d_time), Global::calculate_speed(1.0, d_time)), None),
         Err(e) => GTKhelper::message_box(&window_c, "Error", e, None),
       };

@@ -286,9 +286,13 @@ pub fn gtk_ui() -> gtk::glib::ExitCode {
 
     // Use glib::source::idle_add to update GUI from main thread
     gtk::glib::source::idle_add_local(move || {
-      let same_dir = aps_c.read().settings.same_dir;
-      output_c.set_sensitive(!same_dir);
-      browse_o_btn_c.set_sensitive(!same_dir);
+      {
+        let same_dir = aps_c.read().settings.same_dir;
+        // output_c.set_visible(!same_dir);
+        // browse_o_btn_c.set_visible(!same_dir);
+        output_c.set_sensitive(!same_dir);
+        browse_o_btn_c.set_sensitive(!same_dir);
+      }
 
       if let Ok(prog) = progress_r.try_recv() {
         progress_c.set_fraction(prog);

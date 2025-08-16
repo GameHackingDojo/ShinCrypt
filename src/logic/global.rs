@@ -340,6 +340,40 @@ impl GTKhelper {
     alert.choose(Some(window), None::<&gtk::gio::Cancellable>, move |res| if res == Ok(1) {});
   }
 
+  // pub fn message_box(window: &gtk::ApplicationWindow, message: impl AsRef<str>, detail: impl AsRef<str>, buttons: Option<Vec<&str>>, callback: Option<impl Fn(String) + Copy + Clone + 'static>) {
+  //   let dialog = gtk::Window::builder().transient_for(window).modal(true).title(message.as_ref()).default_width(300).build();
+
+  //   let vbox = gtk::Box::new(gtk::Orientation::Vertical, 12);
+
+  //   let label = gtk::Label::new(Some(detail.as_ref()));
+  //   label.set_wrap(true);
+  //   label.set_xalign(0.5);
+
+  //   vbox.append(&label);
+
+  //   let button_box = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+  //   let buttons: Vec<String> = buttons.unwrap_or_else(|| vec!["Ok"]).into_iter().map(|s| s.to_string()).collect();
+
+  //   for text in buttons {
+  //     let button = gtk::Button::with_label(&text);
+  //     let dialog_clone = dialog.clone();
+  //     if let Some(cb) = callback {
+  //       let callback = cb.clone();
+  //       button.connect_clicked(move |_| {
+  //         dialog_clone.close();
+  //         callback(text.clone());
+  //       });
+  //     }
+
+  //     button_box.append(&button);
+  //   }
+
+  //   vbox.append(&button_box);
+  //   dialog.set_child(Some(&vbox));
+
+  //   dialog.present();
+  // }
+
   pub fn drag_n_drop(entry: &gtk::Entry) {
     let entry_c = entry.clone();
 

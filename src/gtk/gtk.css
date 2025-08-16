@@ -36,3 +36,9 @@ checkbutton check:checked {
   background-color: #aa3a45cc;
   /*color: black; /* tick mark color */
 }
+
+.link {
+  color: #aa3a45cc;
+  text-decoration: underline;
+  cursor: pointer;
+}

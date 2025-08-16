@@ -1,6 +1,6 @@
 [package]
 name = "ShinCrypt"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2024"
 authors = ["Ken Masters <GameHackingDojo@gmail.com>"]
 description = "Secure, fast and free cross platform encryption tool. Uses XChaCha20 not AES as NSA (Nasty Surveillance Agency) recommends"
